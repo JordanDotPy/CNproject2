@@ -1,42 +1,47 @@
-import socket
-from threading import Thread
+import asyncio
 
 
-class BulletinBoardServer:
-    def __init__(self, host, port):
-        self.host = host
-        self.port = port
-        self.clients = {}  # Maps client sockets to usernames
-        self.messages = []  # Stores the last two messages
+class MessageBoardServer:
+    def __init__(self):
+        self.active_users = set()
+        self.messages = []
 
-    def start_server(self):
-        # Code to initialize and start the server socket in a way that it listens indefinitely
-        pass
+    async def handle_client(self, reader, writer):
+        while True:
+            data = await reader.read(100)
+            message = data.decode()
+            addr = writer.get_extra_info('peername')
 
-    def accept_connections(self):
-        # Code to accept incoming client connections in a loop
-        pass
+            if message == 'QUIT':
+                print(f"Closing the connection to {addr}")
+                writer.close()
+                await writer.wait_closed()
+                break
 
-    def client_thread(self, client_socket):
-        # Handles the client connection
-        # Gets the username and welcomes the user
-        # Notifies others of the new user
-        # Shows the last 2 messages and the list of users
-        pass
+            print(f"Received {message} from {addr}")
+            self.messages.append(message)
+            self.notify_users(message)
+            # Send the latest 2 messages to the client
+            latest_messages = self.messages[-2:]
+            response = '\n'.join(latest_messages).encode()
+            writer.write(response)
+            await writer.drain()
 
-    def broadcast(self, message, exclude_socket=None):
-        # Sends a message to all connected clients, except the one specified
-        pass
+    def notify_users(self, message):
+        # Send a notification to all connected users
+        pass  # Replace with logic to notify users
 
-    def remove_client(self, client_socket):
-        # Removes a client from the server and notifies others
-        pass
+    async def main(self, host, port):
+        server = await asyncio.start_server(self.handle_client, host, port)
 
-    def stop_server(self):
-        # Code to stop the server gracefully
-        pass
+        addr = server.sockets[0].getsockname()
+        print(f'Serving on {addr}')
+
+        async with server:
+            await server.serve_forever()
 
 
 if __name__ == "__main__":
-    server = BulletinBoardServer('localhost', 12345)
-    server.start_server()
+    # Replace 'localhost' and '8888' with your server's address and port
+    server = MessageBoardServer()
+    asyncio.run(server.main('localhost', 8888))
