@@ -3,8 +3,9 @@ import threading
 from message import Message
 from manage_user import UserManager
 
+
 class MessageBoardServer:
-    def __init__(self, host='localhost', port=8888):
+    def __init__(self, host='localhost', port=8889):
         self.host = host
         self.port = port
         self.clients = {}  # Store clients as {address: {'username': username, 'client': client_socket}}
@@ -39,7 +40,7 @@ class MessageBoardServer:
             # Check if username is already taken
             print(self.user_manager.users)
             if username in self.user_manager.users:
-                client.send(f"Username '{username}' is already taken. Please choose a different username.\n".encode())
+                client.send(f"Username '{username}' is already taken. Please choose a different username.\n Enter Username: ".encode())
             else:
                 self.user_manager.add_user(username)
                 break
@@ -48,24 +49,17 @@ class MessageBoardServer:
         current_users = self.user_manager.display_current_users()
         client.send(current_users.encode())
         self.clients[address] = {'username': username, 'client': client}
-        self.broadcast(f"{username} has joined the group.", address)
-
-        # After receiving the username, send the list of connected users
-        connected_users = "Connected users: " + ", ".join([info['username'] for addr, info in self.clients.items() if addr != address])
-        client.send(connected_users.encode())
+        self.broadcast(f"\n{username} has joined the group.", address)
 
         while True:
-            try:
-                message = client.recv(1024).decode().strip()
-                print(f"Received message from {address}: {message}")  # Debugging line
-                if not message:
-                    break
-
-                # Process and broadcast the message
-                self.process_message(username, message)
-
-            except ConnectionResetError:
+            message = client.recv(1024).decode().strip()
+            if not message or message == 'exit':
                 break
+
+            if message.startswith("POST"):
+                self.handle_post_message(client, address, message[5:])  # Pass the message text after 'POST'
+            elif message.startswith("RETRIEVE"):
+                self.handle_retrieve_message(client, message[8:])  # Pass the message ID
 
         # Handle user leaving
         print(f"Connection closed from {address}")
@@ -73,27 +67,33 @@ class MessageBoardServer:
         del self.clients[address]
         client.close()
 
-    def process_message(self, username, message_text):
-        # Retrieve the user_id for the given username
-        if username in self.user_manager.users:
-            user_id = self.user_manager.users[username]
-        else:
-            print(f"Error: Username '{username}' not found in user manager.")
-            return  # Optionally handle this error more gracefully
-
+    def handle_post_message(self, client, address, message_text):
+        user_id = self.user_manager.users[self.clients[address]['username']]
         message_id = len(self.messages) + 1
-        new_message = Message(username, user_id, message_text, message_id)
-        formatted_message = new_message.format_message()
+        new_message = Message(self.clients[address]['username'], user_id, message_text, message_id)
         self.messages.append(new_message)
-        self.broadcast(formatted_message)
+        self.broadcast(new_message.format_post_message())
+
+    def handle_retrieve_message(self, client, message_id):
+        try:
+            message_id = int(message_id)
+            message = next((m for m in self.messages if m.id == message_id), None)
+            if message:
+                client.send(message.format_retrieve_message().encode())
+            else:
+                client.send(f"Message with ID {message_id} not found.".encode())
+        except ValueError:
+            client.send("Invalid message ID.".encode())
 
     def broadcast(self, message, sender_address=None):
         for address, client_info in self.clients.items():
             if address != sender_address:
                 try:
+                    print(f"sending {message} to {address}")
                     client_info['client'].send(message.encode())
                 except BrokenPipeError:
                     continue
+
 
 if __name__ == "__main__":
     server = MessageBoardServer()

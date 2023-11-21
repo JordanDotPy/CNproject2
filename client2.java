@@ -6,6 +6,7 @@ public class BulletinBoardClient {
     private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
+    private boolean running = true;
 
     public BulletinBoardClient(String host, int port) {
         try {
@@ -20,32 +21,26 @@ public class BulletinBoardClient {
     public void start() {
         try {
             Scanner scanner = new Scanner(System.in);
-            System.out.print("Enter username: ");
+
+            // Prompt for and send the username to the server
+            System.out.print("-----Welcome to the message board!-----\n");
+            System.out.print("Enter your username: ");
             String username = scanner.nextLine();
-            System.out.println("Sending username: " + username);  // Debugging line
             out.println(username);
 
-            // Start a thread to listen for messages from the server
-            Thread listenerThread = new Thread(() -> {
-                try {
-                    String serverMessage;
-                    while ((serverMessage = in.readLine()) != null) {
-                        System.out.println(serverMessage);
-                    }
-                } catch (IOException e) {
-                    System.out.println("Error reading from server: " + e.getMessage());
-                }
-            });
-
+            // Start a new thread for listening to messages from the server
+            Thread listenerThread = new Thread(this::listenToServer);
             listenerThread.start();
 
-            // Read and send messages to server
-            while (true) {
+            // Main loop for sending messages
+            System.out.println("\nTo send a message, type \"POST\" followed by the message subject.");
+            System.out.println("To retrieve a message, type \"RETRIEVE\" followed by the message ID.");
+            while (running) {
                 String message = scanner.nextLine();
-                System.out.println("Sending message: " + message);  // Debugging line
                 out.println(message);
 
                 if ("exit".equalsIgnoreCase(message)) {
+                    running = false;
                     break;
                 }
             }
@@ -57,8 +52,20 @@ public class BulletinBoardClient {
         }
     }
 
+
+    private void listenToServer() {
+        try {
+            String messageFromServer;
+            while ((messageFromServer = in.readLine()) != null && running) {
+                System.out.println(messageFromServer);
+            }
+        } catch (IOException e) {
+            System.out.println("Error reading from server: " + e.getMessage());
+        }
+    }
+
     public static void main(String[] args) {
-        BulletinBoardClient client = new BulletinBoardClient("localhost", 8888); // Adjust the port if needed
+        BulletinBoardClient client = new BulletinBoardClient("localhost", 8889); // Adjust the port if needed
         client.start();
     }
 }
