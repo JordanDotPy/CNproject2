@@ -5,7 +5,7 @@ from manage_user import UserManager
 
 
 class MessageBoardServer:
-    def __init__(self, host='localhost', port=8889):
+    def __init__(self, host='localhost', port=8888):
         self.host = host
         self.port = port
         self.clients = {}  # Store clients as {address: {'username': username, 'client': client_socket}}
@@ -47,9 +47,14 @@ class MessageBoardServer:
 
         print(f"Received username: {username}")  # Debugging line
         current_users = self.user_manager.display_current_users()
-        client.send(current_users.encode())
         self.clients[address] = {'username': username, 'client': client}
+        client.send(current_users.encode())
         self.broadcast(f"\n{username} has joined the group.", address)
+
+        # Send the last two messages to the new user
+        last_two_messages = self.messages[-2:]
+        for msg in last_two_messages:
+            client.send(msg.format_post_message().encode())
 
         while True:
             message = client.recv(1024).decode().strip()
@@ -86,6 +91,7 @@ class MessageBoardServer:
             client.send("Invalid message ID.".encode())
 
     def broadcast(self, message, sender_address=None):
+        print("BROADCASTING ADDRESSES: ", self.clients.items())
         for address, client_info in self.clients.items():
             if address != sender_address:
                 try:

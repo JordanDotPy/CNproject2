@@ -20,17 +20,16 @@ public class BulletinBoardClient {
 
     public void start() {
         try {
-            Scanner scanner = new Scanner(System.in);
+            // Start a new thread for listening to messages from the server
+            Thread listenerThread = new Thread(this::listenToServer);
+            listenerThread.start();
 
             // Prompt for and send the username to the server
+            Scanner scanner = new Scanner(System.in);
             System.out.print("-----Welcome to the message board!-----\n");
             System.out.print("Enter your username: ");
             String username = scanner.nextLine();
             out.println(username);
-
-            // Start a new thread for listening to messages from the server
-            Thread listenerThread = new Thread(this::listenToServer);
-            listenerThread.start();
 
             // Main loop for sending messages
             System.out.println("\nTo send a message, type \"POST\" followed by the message subject.");
@@ -65,7 +64,7 @@ public class BulletinBoardClient {
     }
 
     public static void main(String[] args) {
-        BulletinBoardClient client = new BulletinBoardClient("localhost", 8889); // Adjust the port if needed
+        BulletinBoardClient client = new BulletinBoardClient("localhost", 8888); // Adjust the port if needed
         client.start();
     }
 }
