@@ -34,6 +34,10 @@ public class BulletinBoardClient {
             // Main loop for sending messages
             System.out.println("\nTo send a message, type \"POST\" followed by the message subject.");
             System.out.println("To retrieve a message, type \"RETRIEVE\" followed by the message ID.");
+            System.out.println("To join a group, type \"JOIN\" followed by the group name");
+            System.out.println("To leave a group, type \"LEAVE\" followed by the group name");
+            System.out.println("To post a group message, type \"POST GROUP\" followed by the group ID along with the message subject");
+            System.out.println("To retrieve a group message, type \"RETRIEVE GROUP\" followed by the group message ID ");
             while (running) {
                 String message = scanner.nextLine();
                 out.println(message);

@@ -17,4 +17,13 @@ class Message:
 
     def format_retrieve_message(self):
         date_str = self.post_date.strftime('%Y-%m-%d %H:%M:%S')
-        return f"\nSUCCESSFULLY RETRIEVED MESSAGE | Message ID: {self.id}, Sender: {self.sender} (ID: {self.user_id}), Date: {date_str}, Subject: {self.subject}"
+        return f"\nSUCCESSFULLY RETRIEVED PUBLIC MESSAGE | Message ID: {self.id}, Sender: {self.sender} (ID: {self.user_id}), Date: {date_str}, Subject: {self.subject}"
+
+    def format_group_message(self, group_name):
+        # Formats the message for display
+        date_str = self.post_date.strftime('%Y-%m-%d %H:%M:%S')
+        return f"\nGroup: {group_name}, Message ID: {self.id}, Sender: {self.sender} (ID: {self.user_id}), Date: {date_str}, Subject: {self.subject}"
+
+    def format_group_retrieve_message(self, group_name):
+        date_str = self.post_date.strftime('%Y-%m-%d %H:%M:%S')
+        return f"\nSUCCESSFULLY RETRIEVED GROUP MESSAGE | Group: {group_name}, Message ID: {self.id}, Sender: {self.sender}, (ID: {self.user_id}), Date: {date_str}, Subject: {self.subject}"
