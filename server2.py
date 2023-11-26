@@ -2,6 +2,7 @@ import socket
 import threading
 from message import Message
 from manage_user import UserManager
+from manage_group import GroupManager
 
 
 class MessageBoardServer:
@@ -11,6 +12,10 @@ class MessageBoardServer:
         self.clients = {}  # Store clients as {address: {'username': username, 'client': client_socket}}
         self.messages = []  # Store messages as tuples (id, username, post_date, message)
         self.user_manager = UserManager()
+        self.group_manager = GroupManager()
+        # Create 5 static groups
+        for i in range(1, 6):
+            self.group_manager.create_group(f"Group_{i}")
 
     def start(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -51,6 +56,10 @@ class MessageBoardServer:
         client.send(current_users.encode())
         self.broadcast(f"\n{username} has joined the group.", address)
 
+        # Send the list of available groups to the client
+        group_list = "\nAvailable groups: " + ", ".join(self.group_manager.groups.keys())
+        client.send(group_list.encode())
+
         # Send the last two messages to the new user
         last_two_messages = self.messages[-2:]
         for msg in last_two_messages:
@@ -90,6 +99,25 @@ class MessageBoardServer:
         except ValueError:
             client.send("Invalid message ID.".encode())
 
+    def handle_join_group(self, client, message, address):
+        _, group_identifier = message.split(maxsplit=1)
+
+        # Determine if the identifier is a name or an ID
+        if group_identifier.isdigit():
+            # User entered a group ID
+            # Group names are formatted like "Group_1", "Group_2", etc.
+            group_name = f"Group_{group_identifier}"
+        else:
+            # User entered a group name
+            group_name = group_identifier
+
+        # Check if the group exists and add the user
+        if group_name in self.group_manager.groups:
+            self.group_manager.add_user_to_group(self.clients[address]['username'], group_name)
+            client.send(f"You have joined {group_name}".encode())
+        else:
+            client.send(f"Group '{group_identifier}' does not exist.".encode())
+
     def broadcast(self, message, sender_address=None):
         print("BROADCASTING ADDRESSES: ", self.clients.items())
         for address, client_info in self.clients.items():
@@ -99,6 +127,13 @@ class MessageBoardServer:
                     client_info['client'].send(message.encode())
                 except BrokenPipeError:
                     continue
+
+    def broadcast_group(self, message, group_name):
+        if group_name in self.group_manager.groups:
+            for username in self.group_manager.groups[group_name]:
+                if username in self.clients:  # assuming self.clients maps usernames to client info
+                    client_info = self.clients[username]
+                    client_info['client'].send(message.encode())
 
 
 if __name__ == "__main__":
