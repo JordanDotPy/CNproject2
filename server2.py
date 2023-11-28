@@ -46,7 +46,7 @@ class MessageBoardServer:
             # Check if username is already taken
             print(self.user_manager.users)
             if username in self.user_manager.users:
-                client.send(f"Username '{username}' is already taken. Please choose a different username.\nRe-enter Username: ".encode())
+                client.send(f"Username '{username}' is already taken. Please choose a different username.\nRe-enter Username below: ".encode())
             else:
                 self.user_manager.add_user(username)
                 break
@@ -71,7 +71,7 @@ class MessageBoardServer:
             if not message or message == 'exit':
                 # Handle user leaving
                 print(f"Connection closed from {address}")
-                self.broadcast(f"{username} has left the Message Board.", address)
+                self.broadcast(f"\n{username} has left the Message Board.", address)
                 # delete the client as well as the username from active users
                 del self.clients[address]
                 del self.user_manager.users[username]
@@ -219,13 +219,16 @@ class MessageBoardServer:
 
         # Check if the group exists and remove the user
         if group_name in self.group_manager.groups:
-            # broadcast to group that user has left the group
-            user_left_group = f"{self.clients[address]['username']} has left {group_name}"
-            self.broadcast_group(user_left_group, group_id)
-            self.group_manager.remove_user_from_group(self.clients[address]['username'], group_name)
-            client.send(f"\nYou have left {group_name}".encode())
+            if self.clients[address]['username'] in self.group_manager.groups[group_name]:
+                # broadcast to group that user has left the group
+                user_left_group = f"\n{self.clients[address]['username']} has left {group_name}"
+                self.broadcast_group(user_left_group, group_id)
+                self.group_manager.remove_user_from_group(self.clients[address]['username'], group_name)
+                client.send(f"\nYou have left {group_name}".encode())
+            else:
+                client.send(f"\nYou are not apart of Group_{group_id}.".encode())
         else:
-            client.send(f"\nGroup '{group_id}' does not exist or you are not a member.".encode())
+            client.send(f"\nGroup_'{group_id}' does not exist.".encode())
 
     def display_active_users_and_groups(self):
         # Compile a list of all active users
