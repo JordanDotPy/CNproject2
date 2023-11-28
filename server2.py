@@ -6,7 +6,7 @@ from manage_group import GroupManager
 
 
 class MessageBoardServer:
-    def __init__(self, host='localhost', port=8888):
+    def __init__(self, host='localhost', port=8889):
         self.host = host
         self.port = port
         self.clients = {}  # Store clients as {address: {'username': username, 'client': client_socket}}
@@ -72,6 +72,10 @@ class MessageBoardServer:
                 # Handle user leaving
                 print(f"Connection closed from {address}")
                 self.broadcast(f"\n{username} has left the Message Board.", address)
+                # remove the user from any group they didnt leave before exiting message board
+                for group_name in self.group_manager.groups.keys():
+                    if username in self.group_manager.groups[group_name]:
+                        self.group_manager.remove_user_from_group(self.clients[address]['username'], group_name)
                 # delete the client as well as the username from active users
                 del self.clients[address]
                 del self.user_manager.users[username]
@@ -79,7 +83,7 @@ class MessageBoardServer:
                 break
 
             if message.startswith("POST GROUP"):
-                # POST to a group with keyword followed by the group ID
+                # POST to a group with keyword followed by the group ID and the message subject
                 split_message = message.split()
                 group_id = split_message[2]
                 print("GROUP ID: ", group_id)
@@ -87,7 +91,7 @@ class MessageBoardServer:
             elif message.startswith("POST"):
                 # POST public message to the server for everyone to see
                 self.handle_public_post_message(client, address, message[5:])
-            elif message.startswith("RETRIEVE GROUP"):
+            elif message.startswith("RETRIEVE GROUP") and len(message.split()) == 4:
                 # RETRIEVE group message with keywords followed by group ID and Group_message ID
                 self.handle_group_retrieve(client, message, address)
             elif message.startswith("RETRIEVE"):

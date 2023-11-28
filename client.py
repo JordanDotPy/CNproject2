@@ -61,5 +61,5 @@ class MessageBoardClient:
 
 
 if __name__ == "__main__":
-    client = MessageBoardClient("localhost", 8888)  # Adjust the host and port if needed
+    client = MessageBoardClient("localhost", 8889)  # Adjust the host and port if needed
     client.start()
