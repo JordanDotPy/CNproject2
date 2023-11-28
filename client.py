@@ -2,7 +2,8 @@ import socket
 import threading
 import sys
 
-class BulletinBoardClient:
+
+class MessageBoardClient:
     def __init__(self, host, port):
         self.host = host
         self.port = port
@@ -56,8 +57,9 @@ class BulletinBoardClient:
         print("To leave a group, type \"LEAVE\" followed by the group name")
         print("To post a group message, type \"POST GROUP\" followed by the group ID along with the message subject")
         print("To retrieve a group message, type \"RETRIEVE GROUP\" followed by the group message ID")
+        print("To retrieve a list of active users and what groups they are in, type \"LIST USERS\"")
 
 
 if __name__ == "__main__":
-    client = BulletinBoardClient("localhost", 8888)  # Adjust the host and port if needed
+    client = MessageBoardClient("localhost", 8888)  # Adjust the host and port if needed
     client.start()

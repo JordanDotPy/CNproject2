@@ -46,13 +46,13 @@ class MessageBoardServer:
             # Check if username is already taken
             print(self.user_manager.users)
             if username in self.user_manager.users:
-                client.send(f"Username '{username}' is already taken. Please choose a different username.\n Enter Username: ".encode())
+                client.send(f"Username '{username}' is already taken. Please choose a different username.\nRe-enter Username: ".encode())
             else:
                 self.user_manager.add_user(username)
                 break
 
         print(f"Received username: {username}")  # Debugging line
-        current_users = self.user_manager.display_current_users()
+        current_users = self.display_active_users_and_groups()
         self.clients[address] = {'username': username, 'client': client}
         client.send(current_users.encode())
         self.broadcast(f"\n{username} has joined the Message Board.", address)
@@ -72,7 +72,9 @@ class MessageBoardServer:
                 # Handle user leaving
                 print(f"Connection closed from {address}")
                 self.broadcast(f"{username} has left the Message Board.", address)
+                # delete the client as well as the username from active users
                 del self.clients[address]
+                del self.user_manager.users[username]
                 client.close()
                 break
 
@@ -80,6 +82,7 @@ class MessageBoardServer:
                 # POST to a group with keyword followed by the group ID
                 split_message = message.split()
                 group_id = split_message[2]
+                print("GROUP ID: ", group_id)
                 self.handle_group_post(client, address, message[12:], group_id)
             elif message.startswith("POST"):
                 # POST public message to the server for everyone to see
@@ -96,6 +99,19 @@ class MessageBoardServer:
             elif message.startswith("LEAVE"):
                 # LEAVE a group with keyword followed by group ID or NAME
                 self.handle_leave_group(client, message, address)
+            elif message == "LIST USERS":
+                client.send(self.display_active_users_and_groups().encode())
+            else:
+                bad_format_message = "\nThe formatting of your message seems to be invalid."
+                display_keys = "\nTo send a message, type \"POST\" followed by the message subject." \
+                               "\nTo retrieve a message, type \"RETRIEVE\" followed by the message ID." \
+                               "\nTo join a group, type \"JOIN\" followed by the group name" \
+                               "\nTo leave a group, type \"LEAVE\" followed by the group name" \
+                               "\nTo post a group message, type \"POST GROUP\" followed by the group ID along with the message subject" \
+                               "\nTo retrieve a group message, type \"RETRIEVE GROUP\" followed by the group message ID" \
+                               "\nTo retrieve a list of active users and what groups they are in, type \"LIST USERS\""
+                client.send(bad_format_message.encode())
+                client.send(display_keys.encode())
 
     def handle_public_post_message(self, client, address, message_text):
         user_id = self.user_manager.users[self.clients[address]['username']]
@@ -106,11 +122,22 @@ class MessageBoardServer:
 
     def handle_group_post(self, client, address, message_text, group_id):
         group_name = f'Group_{group_id}'
-        user_id = self.user_manager.users[self.clients[address]['username']]
-        message_id = len(self.group_messages[group_name]) + 1
-        new_message = Message(self.clients[address]['username'], user_id, message_text, message_id)
-        self.group_messages[group_name].append(new_message)
-        self.broadcast_group(new_message.format_group_message(group_id), group_id)
+        if group_name in self.group_manager.groups:
+            # check is user is within the group he wants to post the message from
+            if self.clients[address]['username'] in self.group_manager.groups[group_name]:
+                try:
+                    user_id = self.user_manager.users[self.clients[address]['username']]
+                    message_id = len(self.group_messages[group_name]) + 1
+                    new_message = Message(self.clients[address]['username'], user_id, message_text, message_id)
+                    self.group_messages[group_name].append(new_message)
+                    self.broadcast_group(new_message.format_group_message(group_id), group_id)
+                except ValueError:
+                    client.send("\nInvalid Group ID.".encode())
+            else:
+                not_in_group = f"\nYou are not apart of {group_name}"
+                return client.send(not_in_group.encode())
+        else:
+            client.send(f"\n{group_name} does not exist.".encode())
 
     def handle_public_retrieve_message(self, client, message_id):
         try:
@@ -119,65 +146,98 @@ class MessageBoardServer:
             if message:
                 client.send(message.format_retrieve_message().encode())
             else:
-                client.send(f"Message with ID {message_id} not found.".encode())
+                client.send(f"\nPublic message with ID {message_id} not found.".encode())
         except ValueError:
-            client.send("Invalid message ID.".encode())
+            client.send("\nInvalid public message ID.".encode())
 
     def handle_group_retrieve(self, client, message, address):
-        _, group_id, message_id = message.split()
+        _, _, group_id, message_id = message.split()
+        print("RETRIEVE GROUP GROUP ID: ", group_id)
         group_name = f"Group_{group_id}"
 
         if group_name in self.group_manager.groups:
+            # check is user is within the group he wants to retrieve the message from
             if self.clients[address]['username'] in self.group_manager.groups[group_name]:
                 try:
                     message_id = int(message_id)
+                    print('MESSAGE ID: ', message_id)
                     group_messages = self.group_messages[group_name]
-                    retrieved_message = group_messages[message_id] if 0 <= message_id < len(group_messages) else None
+                    print("LENGTH OF GROUP MESSAGE: ", len(group_messages))
+                    retrieved_message = group_messages[message_id - 1] if 0 < message_id <= len(group_messages) else None
+                    # message was found in the right group
                     if retrieved_message:
-                        client.send(retrieved_message.format_message().encode())
+                        client.send(retrieved_message.format_group_retrieve_message(group_name).encode())
                     else:
-                        client.send(f"Message with ID {message_id} not found in {group_name}.".encode())
+                        client.send(f"\nMessage with ID {message_id} not found in {group_name}.".encode())
+                # improper use of message ID
                 except ValueError:
-                    client.send("Invalid message ID.".encode())
+                    client.send("\nInvalid message ID.".encode())
             else:
-                client.send(f"You are not a member of {group_name}.".encode())
+                client.send(f"\nYou are not a member of {group_name}.".encode())
         else:
-            client.send(f"Group '{group_id}' does not exist.".encode())
+            client.send(f"\nGroup_{group_id} does not exist.".encode())
 
     def handle_join_group(self, client, address, message):
-        _, group_identifier = message.split(maxsplit=1)
-        print(group_identifier)
+        _, group_id = message.split(maxsplit=1)
         # Determine if the identifier is a name or an ID
-        if group_identifier.isdigit():
+        if group_id.isdigit():
             # User entered a group ID
             # Group names are formatted like "Group_1", "Group_2", etc.
-            group_name = f"Group_{group_identifier}"
+            group_name = f"Group_{group_id}"
         else:
             # User entered a group name
-            group_name = group_identifier
+            group_name = group_id
 
         # Check if the group exists and add the user
         if group_name in self.group_manager.groups:
-            self.group_manager.add_user_to_group(self.clients[address]['username'], group_name)
-            client.send(f"\nYou have joined {group_name}".encode())
+            if self.clients[address]['username'] in self.group_manager.groups[group_name]:
+                already_in_group = "\nYou have already joined this group."
+                client.send(already_in_group.encode())
+            else:
+                # broadcast to group that user has joined the group
+                self.group_manager.add_user_to_group(self.clients[address]['username'], group_name)
+                user_joined_group = f"{self.clients[address]['username']} has joined {group_name}"
+                self.broadcast_group(user_joined_group, group_id)
+                client.send(f"\nYou have joined {group_name}".encode())
+                # print the last two messages from the group
+                for msg in self.group_messages[group_name][-2:]:
+                    try:
+                        client.send(msg.format_group_message(group_id).encode())
+                    except IndexError:
+                        continue
         else:
-            client.send(f"Group '{group_identifier}' does not exist.".encode())
+            client.send(f"\nGroup '{group_id}' does not exist.".encode())
 
     def handle_leave_group(self, client, message, address):
-        _, group_identifier = message.split(maxsplit=1)
+        _, group_id = message.split(maxsplit=1)
 
         # Determine if the identifier is a name or an ID
-        if group_identifier.isdigit():
-            group_name = f"Group_{group_identifier}"  # If user entered a group ID
+        if group_id.isdigit():
+            group_name = f"Group_{group_id}"  # If user entered a group ID
         else:
-            group_name = group_identifier  # If user entered a group name
+            group_name = group_id  # If user entered a group name
 
         # Check if the group exists and remove the user
         if group_name in self.group_manager.groups:
+            # broadcast to group that user has left the group
+            user_left_group = f"{self.clients[address]['username']} has left {group_name}"
+            self.broadcast_group(user_left_group, group_id)
             self.group_manager.remove_user_from_group(self.clients[address]['username'], group_name)
-            client.send(f"You have left {group_name}".encode())
+            client.send(f"\nYou have left {group_name}".encode())
         else:
-            client.send(f"Group '{group_identifier}' does not exist or you are not a member.".encode())
+            client.send(f"\nGroup '{group_id}' does not exist or you are not a member.".encode())
+
+    def display_active_users_and_groups(self):
+        # Compile a list of all active users
+        active_users_info = "\nActive Users: " + ", ".join([info['username'] for info in self.clients.values()])
+
+        # Compile information about users in each group
+        group_info = ""
+        for group_name, users in self.group_manager.groups.items():
+            group_users = ", ".join(users)
+            group_info += f"\nGroup {group_name}: {group_users}"
+
+        return active_users_info + group_info
 
     def broadcast(self, message, sender_address=None):
         print("BROADCASTING ADDRESSES: ", self.clients.items())
@@ -190,12 +250,12 @@ class MessageBoardServer:
                     continue
 
     def broadcast_group(self, message, group_id):
-        group_name = f"group_{group_id}"
+        group_name = f"Group_{group_id}"
         if group_name in self.group_manager.groups:
             for username in self.group_manager.groups[group_name]:
-                if username in self.clients:  # assuming self.clients maps usernames to client info
-                    client_info = self.clients[username]
-                    client_info['client'].send(message.encode())
+                for _, client_info in self.clients.items():
+                    if client_info['username'] == username:
+                        client_info['client'].send(message.encode())
 
 
 if __name__ == "__main__":
