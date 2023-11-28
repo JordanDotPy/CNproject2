@@ -6,7 +6,7 @@ Chris Trentmen
 Simon Feist
 
 ## Instructions
-In one terminal, run the server Python file with python3 server.py.
+In one terminal, run the server Python file with python3 server2.py.
 In another terminal, run the client Python file python3 client.py.
 Add more terminals running the client Python files to add more users.
 
