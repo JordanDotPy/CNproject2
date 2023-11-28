@@ -187,6 +187,8 @@ class MessageBoardServer:
         else:
             # User entered a group name
             group_name = group_id
+            group_id = group_id.split("_")
+            group_id = group_id[1]
 
         # Check if the group exists and add the user
         if group_name in self.group_manager.groups:
@@ -196,9 +198,8 @@ class MessageBoardServer:
             else:
                 # broadcast to group that user has joined the group
                 self.group_manager.add_user_to_group(self.clients[address]['username'], group_name)
-                user_joined_group = f"{self.clients[address]['username']} has joined {group_name}"
+                user_joined_group = f"\n{self.clients[address]['username']} has joined {group_name}"
                 self.broadcast_group(user_joined_group, group_id)
-                client.send(f"\nYou have joined {group_name}".encode())
                 # print the last two messages from the group
                 for msg in self.group_messages[group_name][-2:]:
                     try:
@@ -216,6 +217,8 @@ class MessageBoardServer:
             group_name = f"Group_{group_id}"  # If user entered a group ID
         else:
             group_name = group_id  # If user entered a group name
+            group_id = group_id.split("_")
+            group_id = group_id[1]
 
         # Check if the group exists and remove the user
         if group_name in self.group_manager.groups:
@@ -224,7 +227,6 @@ class MessageBoardServer:
                 user_left_group = f"\n{self.clients[address]['username']} has left {group_name}"
                 self.broadcast_group(user_left_group, group_id)
                 self.group_manager.remove_user_from_group(self.clients[address]['username'], group_name)
-                client.send(f"\nYou have left {group_name}".encode())
             else:
                 client.send(f"\nYou are not apart of Group_{group_id}.".encode())
         else:
