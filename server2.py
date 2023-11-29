@@ -97,7 +97,7 @@ class MessageBoardServer:
             elif message.startswith("RETRIEVE"):
                 # RETRIEVE a public message
                 self.handle_public_retrieve_message(client, message[8:])
-            elif message.startswith("JOIN"):
+            elif message.startswith("JOIN") and len(message.split()) == 2:
                 # JOIN a group with keyword followed by group ID or NAME
                 self.handle_join_group(client, address, message)
             elif message.startswith("LEAVE"):
@@ -118,6 +118,7 @@ class MessageBoardServer:
                 client.send(display_keys.encode())
 
     def handle_public_post_message(self, client, address, message_text):
+        # create a formatted message based on client's information, add the message to the public_messages list, and broadcast to all users
         user_id = self.user_manager.users[self.clients[address]['username']]
         message_id = len(self.public_messages) + 1
         new_message = Message(self.clients[address]['username'], user_id, message_text, message_id)
@@ -130,6 +131,7 @@ class MessageBoardServer:
             # check is user is within the group he wants to post the message from
             if self.clients[address]['username'] in self.group_manager.groups[group_name]:
                 try:
+                    # create a formatted message based on client's information, add the message to the group's list, and broadcast to all users within the group
                     user_id = self.user_manager.users[self.clients[address]['username']]
                     message_id = len(self.group_messages[group_name]) + 1
                     new_message = Message(self.clients[address]['username'], user_id, message_text, message_id)
@@ -145,6 +147,7 @@ class MessageBoardServer:
 
     def handle_public_retrieve_message(self, client, message_id):
         try:
+            # with given message ID, find the ID within public message list and retrieve it
             message_id = int(message_id)
             message = next((m for m in self.public_messages if m.id == message_id), None)
             if message:
@@ -250,6 +253,7 @@ class MessageBoardServer:
 
     def broadcast(self, message, sender_address=None):
         print("BROADCASTING ADDRESSES: ", self.clients.items())
+        # send message to all the active users
         for address, client_info in self.clients.items():
             if address != sender_address:
                 try:
@@ -260,7 +264,9 @@ class MessageBoardServer:
 
     def broadcast_group(self, message, group_id):
         group_name = f"Group_{group_id}"
+        # figure out if given group name is one of the 5 static groups
         if group_name in self.group_manager.groups:
+            # check if user is apart pof said group and send message to all group users
             for username in self.group_manager.groups[group_name]:
                 for _, client_info in self.clients.items():
                     if client_info['username'] == username:

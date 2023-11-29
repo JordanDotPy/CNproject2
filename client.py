@@ -41,6 +41,7 @@ class MessageBoardClient:
         self.socket.sendall(message.encode())
 
     def listen_to_server(self):
+        # continuously listen to server for message and print on client side if found
         while self.running:
             try:
                 message = self.socket.recv(1024).decode()
